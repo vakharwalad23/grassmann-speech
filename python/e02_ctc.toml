@@ -1,0 +1,67 @@
+# e02 own trainer (docs/experiments.md): the ESPnet LS-100 CTC recipe (E-Branchformer yaml) rebuilt in plain PyTorch
+
+[data]
+librispeech = "data/librispeech/LibriSpeech"
+train = "train-clean-100"
+valid = ["dev-clean", "dev-other"]
+test = ["dev-clean", "dev-other", "test-clean", "test-other"]
+speed_factors = [0.9, 1.0, 1.1]
+max_seconds = 30.0
+vocab = 5000
+mvn_utterances = 2000
+
+[features]
+n_fft = 512
+win = 400
+hop = 160
+n_mels = 80
+
+[specaug]
+warp_window = 5
+freq_masks = 2
+freq_width = 27
+time_masks = 5
+time_ratio = 0.05
+
+[model]
+layers = 15
+d = 256
+heads = 4
+kernel = 31
+r = 32
+offsets = [1, 2, 4, 8, 12, 16]
+dropout = 0.1
+
+[train]
+epochs = 70
+batch_bins = 16000000
+accum = 4
+lr = 0.002
+weight_decay = 0.000001
+warmup = 15000
+grad_clip = 5.0
+keep_best = 10
+workers = 8
+
+# Arms differ only in the sequence mixer; no mixer widens the FFN to stay within 0.1 percent of attention's 26,958,472
+[arms.attention]
+mixer = "attention"
+d_ff = 1024
+
+[arms.grassmann]
+mixer = "grassmann"
+d_ff = 1024
+
+[arms.symmetric]
+mixer = "symmetric"
+d_ff = 1024
+
+[arms.no_mixer]
+mixer = "none"
+d_ff = 1344
+
+# Code-path check on a synthetic corpus: tiny model, few batches
+[quick]
+data = { vocab = 40, mvn_utterances = 8 }
+model = { layers = 2 }
+train = { epochs = 2, batch_bins = 600000, accum = 2, warmup = 4, keep_best = 2, workers = 0 }
