@@ -83,15 +83,15 @@ def asr_step(kind: str, batch: int, layers: int, seconds: float, device: str) ->
     mixer, precision = kind.rsplit("_", 1)
     model = conformer_ctc(layers, mixer).to(device)
     feats = torch.randn(batch, int(seconds * 100), 80, device=device)
-    frames = ((feats.shape[1] - 1) // 2 - 1) // 2
     # ~2.7 words/s in LibriSpeech test-clean (52,576 words / 5.4 h), ~1.5 BPE-5000 tokens per word (assumed)
     n_targets = max(1, int(seconds * 4))
     targets = torch.randint(1, 5000, (batch, n_targets), device=device)
-    input_lengths = torch.full((batch,), frames, dtype=torch.long, device=device)
+    feat_lengths = torch.full((batch,), feats.shape[1], dtype=torch.long, device=device)
     target_lengths = torch.full((batch,), n_targets, dtype=torch.long, device=device)
 
     def loss() -> torch.Tensor:
-        return F.ctc_loss(model(feats).transpose(0, 1).float(), targets, input_lengths, target_lengths)
+        log_probs, out_lengths = model(feats, feat_lengths)
+        return F.ctc_loss(log_probs.transpose(0, 1).float(), targets, out_lengths, target_lengths)
 
     return train_step(model, loss, precision == "bf16", device)
 
