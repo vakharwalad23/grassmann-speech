@@ -1,0 +1,45 @@
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+.netrc
+credentials*.json
+
+# Downloads, caches, outputs (make clean removes the first four)
+.cache/
+.venv/
+work/
+data/
+reports/
+vendor/
+exp/
+
+# Audio, weights, archives
+*.wav
+*.flac
+*.mp3
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.parquet
+*.arrow
+*.tar
+*.tar.gz
+*.zip
+
+# Python
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/
+
+# OS and editors
+.DS_Store
+._*
+.vscode/
+.idea/
+*.swp
+*.log
