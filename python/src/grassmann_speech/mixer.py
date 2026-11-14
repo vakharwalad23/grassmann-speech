@@ -31,41 +31,47 @@ class GrassmannMixer(nn.Module):
         self.register_buffer("i", i, persistent=False)
         self.register_buffer("j", j, persistent=False)
 
-    def forward(self, h: torch.Tensor) -> torch.Tensor:
-        z = self.red(h)
-        return self.anchored(z) if self.mean_first else self.as_written(z)
+    def forward(self, h: torch.Tensor, valid: torch.Tensor | None = None) -> torch.Tensor:
+        """valid (batch, length) marks real frames: a pair counts only when both ends are real, padding gets g = 0."""
+        # Lagrange norms cancel in half precision and |z|^4 overflows fp16, so the mix runs in fp32 under autocast
+        with torch.autocast(h.device.type, enabled=False):
+            z = self.red(h.to(self.red.weight.dtype))
+            weight = None if valid is None else valid[..., None].to(z.dtype)
+            return self.anchored(z, weight) if self.mean_first else self.as_written(z, weight)
 
     def pairs(self, length: int):
         for delta in self.offsets:
             if delta < length:
                 yield delta
 
-    def as_written(self, z: torch.Tensor) -> torch.Tensor:
+    def as_written(self, z: torch.Tensor, weight: torch.Tensor | None) -> torch.Tensor:
         """2512.19428 as printed: project every unit pair, then average over the valid pairs of each position."""
         acc = z.new_zeros(*z.shape[:2], self.plu.out_features)
-        count = z.new_zeros(1, z.shape[1], 1)
+        count = z.new_zeros(*z.shape[:2], 1)
         for delta in self.pairs(z.shape[1]):
+            both = 1.0 if weight is None else weight[:, :-delta] * weight[:, delta:]
             # Paper pairs (z_t, z_{t+delta}) at t; assigning the pair to t+delta instead makes it causal (docs/architecture.md, A1)
-            q = self.plu(unit(self.feature(z[:, :-delta], z[:, delta:], self.i, self.j), self.eps))
+            q = both * self.plu(unit(self.feature(z[:, :-delta], z[:, delta:], self.i, self.j), self.eps))
             acc[:, delta:] += q
-            count[:, delta:] += 1
+            count[:, delta:] += both
             if self.two_sided:
                 acc[:, :-delta] += q
-                count[:, :-delta] += 1
+                count[:, :-delta] += both
         # Positions with no valid pair get g = 0 (docs/architecture.md, A3)
         return acc / count.clamp_min(1) * (count > 0)
 
-    def anchored(self, z: torch.Tensor) -> torch.Tensor:
+    def anchored(self, z: torch.Tensor, weight: torch.Tensor | None) -> torch.Tensor:
         """Same output as as_written: all pairs at t share z_t and the feature is linear in the partner, so one feature per token."""
         partner = torch.zeros_like(z)
-        count = z.new_zeros(1, z.shape[1], 1)
+        count = z.new_zeros(*z.shape[:2], 1)
         for delta in self.pairs(z.shape[1]):
             earlier, later = z[:, :-delta], z[:, delta:]
+            both = 1.0 if weight is None else weight[:, :-delta] * weight[:, delta:]
             # Norms from dot products lose precision only for near-parallel pairs, which the eps clamp caps anyway
-            w = self.norm_sq(earlier, later).clamp_min(0).sqrt().clamp_min(self.eps).reciprocal()
+            w = both * self.norm_sq(earlier, later).clamp_min(0).sqrt().clamp_min(self.eps).reciprocal()
             partner[:, delta:] += w * earlier
-            count[:, delta:] += 1
+            count[:, delta:] += both
             if self.two_sided:
                 partner[:, :-delta] += self.flip * w * later
-                count[:, :-delta] += 1
+                count[:, :-delta] += both
         return self.plu(self.feature(partner / count.clamp_min(1), z, self.i, self.j)) * (count > 0)

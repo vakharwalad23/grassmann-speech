@@ -70,3 +70,23 @@ def test_mean_first_stays_close_in_float32(two_sided: bool):
     fast.load_state_dict(paper.state_dict())
     a = x().float()
     assert torch.allclose(paper(a), fast(a), atol=1e-5)
+
+
+@pytest.mark.parametrize("two_sided", [False, True])
+@pytest.mark.parametrize("mean_first", [False, True])
+@pytest.mark.parametrize("features", ["plucker", "symmetric"])
+def test_padding_changes_nothing_on_real_frames(two_sided: bool, mean_first: bool, features: str):
+    m, a = mixer(two_sided, mean_first=mean_first, features=features), x(25)
+    padded = torch.cat([a, 100 * torch.randn(2, L - 25, D, dtype=torch.float64)], dim=1)
+    valid = torch.arange(L) < 25
+    out = m(padded, valid.expand(2, L))
+    assert torch.allclose(out[:, :25], m(a), atol=1e-12)
+    assert torch.equal(out[:, 25:], torch.zeros_like(out[:, 25:]))
+
+
+def test_mix_stays_fp32_under_bf16_autocast():
+    m, a = mixer(True).float(), x().float()
+    with torch.autocast("cpu", dtype=torch.bfloat16):
+        out = m(a)
+    assert out.dtype == torch.float32
+    assert torch.allclose(out, m(a), atol=1e-6)
