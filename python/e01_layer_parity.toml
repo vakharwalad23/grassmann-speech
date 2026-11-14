@@ -1,0 +1,57 @@
+# e01 layer parity (docs/experiments.md): data and model of 2512.19428 Sec 4.1; optimizer and schedule from kanenorman's reimplementation (248.7), no clip
+
+[data]
+dataset = "Salesforce/wikitext"
+dataset_revision = "b08601e04326c79dfdd32d625aee71d232d685c3"
+subset = "wikitext-2-raw-v1"
+tokenizer = "google-bert/bert-base-uncased"
+tokenizer_revision = "86b5e0934494bd15c9632b12f734a8a67f723594"
+
+[train]
+block = 128
+batch = 32
+epochs = 30
+lr = 1e-3
+weight_decay = 0.01
+dropout = 0.1
+
+# Order: one full seed set before the next, so a cut night still leaves comparable arms
+[[run]]
+arm = "transformer"
+seed = 0
+
+[[run]]
+arm = "grassmann"
+seed = 0
+
+[[run]]
+arm = "control_symmetric"
+seed = 0
+
+[[run]]
+arm = "grassmann_one_offset"
+seed = 0
+
+[[run]]
+arm = "transformer"
+seed = 1
+
+[[run]]
+arm = "grassmann"
+seed = 1
+
+[[run]]
+arm = "control_symmetric"
+seed = 1
+
+[[run]]
+arm = "transformer"
+seed = 2
+
+[[run]]
+arm = "grassmann"
+seed = 2
+
+[[run]]
+arm = "control_symmetric"
+seed = 2
