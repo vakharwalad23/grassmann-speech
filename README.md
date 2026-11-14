@@ -69,3 +69,7 @@ ignored by git. `make clean` deletes `.cache/`, `work/` and the virtual environm
   [github.com/kanenorman/grassmann](https://github.com/kanenorman/grassmann).
 - Data: Wikitext-2 (CC BY-SA 3.0, GFDL) and the bert-base-uncased tokenizer (Apache-2.0), fetched at pinned
   revisions from the Hugging Face Hub.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Data and third-party code keep their own licenses (Credits above).

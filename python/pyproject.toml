@@ -3,6 +3,7 @@ name = "grassmann-speech"
 version = "0.1.0"
 description = "Causal Grassmann layer (arXiv 2512.19428) vs attention: language-model parity and speech recognition"
 requires-python = ">=3.15"
+license = "MIT"
 dependencies = [
     "pyarrow==26.0.1",
     "tokenizers==0.23.3",
