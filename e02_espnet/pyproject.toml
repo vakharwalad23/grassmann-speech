@@ -1,0 +1,19 @@
+[project]
+name = "e02-espnet"
+version = "0.1.0"
+description = "e02 ESPnet track: the LS-100 CTC recipe with Grassmann encoders registered"
+# ESPnet 202611 supports Python 3.12 to 3.13 and torch 2.11 to 2.14 with torchaudio 2.11 (PyPI metadata)
+requires-python = "==3.13.*"
+dependencies = [
+    "espnet[asr]==202611",
+    "matplotlib",
+    "tensorboard",
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 140

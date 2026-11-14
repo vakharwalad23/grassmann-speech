@@ -9,8 +9,12 @@ export RUFF_CACHE_DIR := $(ROOT)/.cache/ruff
 export PYTHONDONTWRITEBYTECODE := 1
 
 UV := uv run --project python
+ARM ?= attention
+SEED ?= 0
+LIBRISPEECH_PARTS := dev-clean dev-other test-clean test-other train-clean-100
 
-.PHONY: help setup test lint probe-quick probe e01-quick e01-parity e01 clean
+.PHONY: help setup test lint probe-quick probe e01-quick e01-parity e01 e02-data e02-quick e02-prepare e02-train e02-decode \
+	e02-espnet-check e02-espnet-setup e02-espnet-prepare e02-espnet clean
 
 help:
 	@echo "setup        python/.venv from uv.lock (torch 2.15.0, Python 3.15)"
@@ -21,7 +25,16 @@ help:
 	@echo "e01-quick    e01 code paths: 1 epoch of 5 batches per run, into work/"
 	@echo "e01-parity   e01 Transformer seed 0 only, ~0.8 h on an M3 Pro"
 	@echo "e01          e01 full sweep, 10 runs, ~9 h on an M3 Pro; finished runs are skipped"
-	@echo "clean        delete .cache, work and python/.venv (keeps reports)"
+	@echo "e02-data     LibriSpeech dev, test and train-clean-100 from OpenSLR into data/librispeech, 7.6 GB"
+	@echo "e02-quick    e02 own trainer, every arm on a synthetic corpus, ~10 s"
+	@echo "e02-prepare  e02 own trainer: split lists, sealed dev/test manifests in corpora/, tokenizer, MVN stats"
+	@echo "e02-train    e02 own trainer, ARM=attention|grassmann|symmetric|no_mixer SEED=0; resumable"
+	@echo "e02-decode   e02 own trainer: average the best checkpoints, greedy decode, score dev and test"
+	@echo "e02-espnet-check    ESPnet track on CPU: arm sizes, frontend parity, 1-epoch train and decode per arm, ~2 min"
+	@echo "e02-espnet-setup    pinned ESPnet recipe in vendor/espnet and e02_espnet/.venv; needs sox and flac"
+	@echo "e02-espnet-prepare  ESPnet recipe stages 1-10 once: data prep, speed perturbation, BPE, stats"
+	@echo "e02-espnet   ESPnet track ARM=attention|grassmann|symmetric|no_mixer SEED=0: train, greedy decode, score"
+	@echo "clean        delete .cache, work, vendor and the virtual environments (keeps data and reports)"
 
 setup:
 	@uv sync --project python --locked
@@ -30,7 +43,7 @@ test:
 	@$(UV) pytest python/tests
 
 lint:
-	@uv tool run ruff check python
+	@uv tool run ruff check python e02_espnet
 
 probe-quick:
 	@$(UV) python python/e00_mps_probe.py --quick
@@ -47,5 +60,38 @@ e01-parity:
 e01:
 	@$(UV) python -I python/e01_layer_parity.py
 
+e02-data:
+	@mkdir -p data/librispeech
+	@for part in $(LIBRISPEECH_PARTS); do \
+		[ -d data/librispeech/LibriSpeech/$$part ] && continue; \
+		curl -fL -C - -o data/librispeech/$$part.tar.gz https://www.openslr.org/resources/12/$$part.tar.gz \
+			&& tar -xzf data/librispeech/$$part.tar.gz -C data/librispeech && rm data/librispeech/$$part.tar.gz || exit 1; \
+	done
+
+e02-quick:
+	@$(UV) python -I python/e02_ctc.py quick
+
+e02-prepare:
+	@$(UV) python -I python/e02_ctc.py prepare
+
+e02-train:
+	@$(UV) python -I python/e02_ctc.py train --arm $(ARM) --seed $(SEED)
+
+e02-decode:
+	@$(UV) python -I python/e02_ctc.py decode --arm $(ARM) --seed $(SEED)
+
+e02-espnet-check:
+	@uv sync --project e02_espnet --locked -q
+	@PATH="$(ROOT)/e02_espnet/.venv/bin:$$PATH" PYTHONPATH="$(ROOT)/python/src:$(ROOT)/e02_espnet" python3 e02_espnet/check.py
+
+e02-espnet-setup:
+	@bash e02_espnet/setup.sh
+
+e02-espnet-prepare:
+	@bash e02_espnet/run.sh prepare
+
+e02-espnet:
+	@bash e02_espnet/run.sh $(ARM) $(SEED)
+
 clean:
-	@rm -rf .cache work python/.venv
+	@rm -rf .cache work vendor python/.venv e02_espnet/.venv

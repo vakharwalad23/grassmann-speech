@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Passed to asr.sh as --python: one executable word in front of every ESPnet python call
+exec python3 "$(dirname "$0")/launch.py" "$@"
