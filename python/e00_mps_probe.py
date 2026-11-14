@@ -245,7 +245,7 @@ def main() -> None:
             print(f"\n{name}: {report[name]}")
         else:
             print_rows(name, report[name], keys)
-        # Saved after every section so a memguard kill keeps what finished
+        # Saved after every section so a killed run keeps what finished
         if path is not None:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(report, indent=1))
