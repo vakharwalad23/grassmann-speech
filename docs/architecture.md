@@ -86,36 +86,67 @@ partner sum. The output is identical (unit test in float64, 1e-12), and the laye
 Apple GPU ([results.md](results.md#e00-speed-probe)). Proof in [math.md](math.md#mean-first-form-is-exact).
 `mean_first=False` keeps the paper's form.
 
-## Speech: Conformer-CTC with a mixer slot
+## Speech: Conformer-CTC (e02)
 
-Used by the e00 speed probe; the shape of the planned speech experiment.
+The e02 encoder is laid out as ESPnet's Conformer (`espnet2` `ConformerEncoder`) so the same model runs in ESPnet and in
+this repo's own trainer; only the sequence mixer changes between arms.
 
 ```mermaid
 flowchart LR
-    X["80 log-mel, 10 ms"] --> S["2 x conv 3x3 stride 2, 40 ms"]
+    W["16 kHz audio"] --> X["80 log-mel, 25 ms / 10 ms, SpecAugment, global MVN"]
+    X --> S["2 x conv 3x3 stride 2, 40 ms; x sqrt(d), dropout"]
     S --> C["15 Conformer blocks, d 256"]
-    C --> H["Linear 256 -> 5000"]
+    C --> N[LayerNorm]
+    N --> H["Linear 256 -> 5000"]
     H --> CTC[CTC]
 ```
 
 ```mermaid
 flowchart LR
-    I[x] --> F1["x + 1/2 FFN(x)"]
-    F1 --> MX["x + mixer(LN(x))"]
-    MX --> CV["x + conv module, kernel 31"]
-    CV --> F2["x + 1/2 FFN(x)"]
+    I[x] --> F1["x + 1/2 FFN(LN x)"]
+    F1 --> MX["x + mixer(LN x, mask, positions)"]
+    MX --> CV["x + conv module(LN x), kernel 31"]
+    CV --> F2["x + 1/2 FFN(LN x)"]
     F2 --> LN[LayerNorm]
 ```
 
-| mixer | per block | 15 blocks + subsampling + head | total |
+| arm | mixer in each block | mixer + its LN | total |
 |---|---|---|---|
-| multi-head attention, 4 heads | 263,680 (with its LN) | 1,522,944 per block | 25,967,240 |
-| two-sided gated Grassmann | 267,296 (with its LN) | 1,526,560 per block | 26,021,480 |
+| **attention** | multi-head attention with Transformer-XL relative positions, 4 heads (ESPnet `rel_selfattn`) | 329,728 | **26,958,472** |
+| grassmann | two-sided gated Grassmann, r 32, offsets {1, 2, 4, 8, 12, 16} each side | 267,296 | 26,021,992 |
+| symmetric | same with symmetric products in place of the Plucker minors | 267,296 | 26,021,992 |
+| no_mixer | none; FFN width 1344 instead of 1024 | 512 | 26,945,032 |
 
-Shared parts: subsampling 1,838,080; two FFN modules 1,052,160 and conv module 206,592 per block; CTC head
-1,285,000.
+Shared parts: subsampling 1,838,080; per block two FFN modules 1,052,160, conv module 206,592, final LN 512; encoder
+LN 512; CTC head 1,285,000. The counts are unit tests and agree with ESPnet's own modules (`e02_espnet/check.py`).
 
-Two-sided Grassmann (this repo's variant, not the paper's method): speech is not generated left to right, so
-each position also pairs with z_t+delta. Both pairs are ordered (earlier, later); Plucker antisymmetry then
-tells past from future. The gate runs as a residual branch, `(1 - alpha)(g - u)` with u = LN(x): the paper's
-blend alpha u + (1 - alpha) g minus u, so alpha = 1 adds nothing to the residual stream.
+Two-sided Grassmann (this repo's variant, not the paper's method): speech is not generated left to right, so each
+position also pairs with z_t+delta. Both pairs are ordered (earlier, later); Plucker antisymmetry then tells past
+from future. The gate runs as a residual branch, `(1 - alpha)(g - u)` with u = LN(x): the paper's blend
+alpha u + (1 - alpha) g minus u, so alpha = 1 adds nothing to the residual stream.
+
+Batched speech is padded. Every mixer takes a mask of real frames: attention masks padded keys, the conv module zeroes
+padded frames before its depthwise convolution, and the Grassmann mean counts a pair only when both frames are real.
+Under mixed precision the Grassmann pair features run in fp32: the Lagrange norm |a|^2 |b|^2 - (a . b)^2 cancels in
+bf16 and |z|^4 overflows fp16.
+
+### Two code paths
+
+```mermaid
+flowchart TD
+    L["layer code: python/src/grassmann_speech"] --> O["own trainer: python/e02_ctc.py"]
+    L --> P["e02_espnet/encoder.py: ESPnet ConformerEncoder, self-attention swapped per block"]
+    P --> R["e02_espnet/launch.py registers the encoder, then runs espnet2.bin.asr_train / asr_inference"]
+    R --> A["ESPnet recipe asr.sh --python e02_espnet/python, unpatched"]
+    O --> W["grassmann_speech.wer: one scorer"]
+    A --> W
+```
+
+The ESPnet track keeps ESPnet unpatched: `asr.sh` calls every Python tool through `--python`, so a one-line shim
+routes the training and inference entry points through a launcher that adds `mixer_conformer` to ESPnet's encoder
+registry first.
+
+### e00 shape
+
+The e00 speed probe ran an earlier version of this model: plain multi-head attention without relative positions or
+padding masks (25,967,240 params for the attention arm, 26,021,480 for Grassmann).

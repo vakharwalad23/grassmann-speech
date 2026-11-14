@@ -107,6 +107,17 @@ Worked example, L = 128, d = 256, r = 32, C = 496: mean-first 2 x 128 x 256 x 32
 2.10M + 32.5M = 34.6M; as written 2.10M + 2 x (127 + 126 + 124 + 120 + 116 + 112) x 496 x 256 = 2.10M + 184.1M
 = 186.2M. Both are linear in L. Attention adds 4 L^2 d for QK^T and AV on top of its 8 L d^2 projections.
 
+## Padding
+
+With a mask v_t (1 for a real frame, 0 for padding), a pair counts only when both ends are real:
+
+```math
+s_t = \frac{\sum_{\delta} v_{t-\delta} v_t \, z_{t-\delta} / n_{t-\delta,\,t}}{\max\left(1, \sum_{\delta} v_{t-\delta} v_t\right)}
+```
+
+Real frames then get the same output as the unpadded sequence, and padded frames get g = 0
+(`test_padding_changes_nothing_on_real_frames`).
+
 ## Receptive field
 
 All offsets in every layer: each layer reaches back 16 positions, so 6 layers reach 6 x 16 = 96 tokens. One
@@ -127,6 +138,28 @@ An interval that contains ratio 1 is a tie.
 
 Worked example, Grassmann vs Transformer: Delta = 5.7991 - 5.5132 = 0.2859, SE 0.0053, CI 0.2631 to 0.3087,
 ratio 1.301 to 1.362.
+
+## Speech recognition (e02)
+
+```math
+\mathrm{WER} = \frac{S + D + I}{N}
+```
+
+S, D, I are substituted, deleted and inserted words after normalization (upper case, whitespace split); N is the
+number of reference words. CER is the same over characters. Worked example: reference THE CAT SAT ON A MAT,
+hypothesis THE BAT SAT ON MAT: S = 1, D = 1, I = 0, N = 6, so WER = 2 / 6 = 33.3 percent.
+
+Paired bootstrap: speakers are resampled with replacement 1,000 times; each draw gives WER(A) - WER(B) over the
+utterances of the drawn speakers. The 2.5 and 97.5 percentiles bound the difference; an interval that holds 0 is a tie.
+
+Learning rate (ESPnet WarmupLR), step k counted from 1, peak lr eta = 2e-3 at w = 15,000:
+
+```math
+\eta_k = \eta \, w^{0.5} \min\left(k^{-0.5},\; k\, w^{-1.5}\right)
+```
+
+Worked example: k = 7,500 gives eta x 15000^0.5 x 7500 x 15000^-1.5 = eta x 0.5 = 1e-3; k = 60,000 gives
+eta x (15000 / 60000)^0.5 = 1e-3.
 
 ## Run-time projection (e00)
 
