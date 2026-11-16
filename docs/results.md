@@ -1,8 +1,42 @@
 # Results
 
-Every number measured with this code. Hardware for all of them: Apple M3 Pro (14-core GPU), 18 GB, macOS
-27.0.1 (26A434), AC power, torch 2.15.0 on MPS, Python 3.15.0, 2026-11-13 to 2026-11-14. How each run was set
-up: [experiments.md](experiments.md).
+Every number measured with this code. Hardware: e02 on one NVIDIA A100-SXM4-40GB (driver 610.57.04, Linux 5.15,
+torch 2.11.0+cu130, ESPnet v.202611, Python 3.13), 2026-11-15 to 2026-11-16; e00 and e01 on an Apple M3 Pro (14-core
+GPU), 18 GB, macOS 27.0.1 (26A434), AC power, torch 2.15.0 on MPS, Python 3.15.0, 2026-11-13 to 2026-11-14. How each
+run was set up: [experiments.md](experiments.md).
+
+## e02 Conformer-CTC on LibriSpeech-100
+
+ESPnet track, seed 0. Greedy CTC on the average of the 10 best epochs by validation CER; `grassmann_speech.wer`,
+normalization 1.
+
+### Attention parity
+
+| set | WER (errors / words) | CER (errors / chars) | published (arXiv 2406.16808) |
+|---|---|---|---|
+| dev-clean | 9.45 (5,143 / 54,402) | 4.24 (12,235 / 288,456) | - |
+| dev-other | 22.42 (11,424 / 50,948) | 11.97 (31,847 / 265,951) | - |
+| **test-clean** | **9.72 (5,113 / 52,576)** | 4.24 (11,933 / 281,530) | 9.8 |
+| **test-other** | **22.90 (11,986 / 52,343)** | 12.26 (33,431 / 272,758) | 23.3 |
+
+Parity: test-clean within 0.1, test-other 0.4 better; one seed. Attention, 26,958,472 params: 70 epochs in 9.48 h,
+~2,474 audio s/s, peak 22.0 GB; no nan or inf gradients.
+
+### Grassmann, partial run (16 of 70 epochs, no decode)
+
+Validation CER (dev-clean + dev-other) per epoch, single checkpoint, against the attention run at the same epoch. No WER
+until the run finishes.
+
+| epoch | Grassmann | attention | gap (points) |
+|---|---|---|---|
+| 3 | 60.5 | 48.2 | 12.3 |
+| 6 | 32.5 | 25.1 | 7.4 |
+| 9 | 23.0 | 19.4 | 3.6 |
+| 12 | 19.0 | 16.7 | 2.3 |
+| **16** | **16.7** | **14.6** | **2.1** |
+
+Grassmann, 26,021,992 params: 10 min 18 s training per epoch against 7 min 19 s for attention (~1,760 audio s/s, 0.71x),
+peak 21.3 GB. The learning rate is still warming up at epoch 16 (peak near epoch 26).
 
 ## e01 language-model parity
 

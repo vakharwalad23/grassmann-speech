@@ -7,7 +7,7 @@ flowchart LR
     E0["e00 speed probe"] --> Q["e01 quick"]
     Q --> P["e01 parity: Transformer seed 0"]
     P --> F["e01 full sweep: 10 runs"]
-    F --> G["e02 speech: ESPnet track and own trainer, planned"]
+    F --> G["e02 speech: ESPnet parity done, other arms running"]
 ```
 
 ## e00: speed and memory probe
@@ -100,9 +100,11 @@ Limits:
 - One seed for one offset per layer, so its edge is not yet a measured difference.
 - The paper reports validation perplexity only; test perplexity here is extra.
 
-## e02: Grassmann vs attention in a Conformer-CTC on LibriSpeech-100 (planned)
+## e02: Grassmann vs attention in a Conformer-CTC on LibriSpeech-100 (running)
 
-Status: code complete and checked on CPU; not run. No e02 number exists yet.
+Status: the attention arm reproduces the published WER on the ESPnet track (9.72 / 22.90 vs 9.8 / 23.3, seed 0).
+Grassmann seed 0 ran 16 of 70 epochs. Symmetric, no_mixer and the own trainer have not run. Numbers:
+[results.md](results.md#e02-conformer-ctc-on-librispeech-100).
 
 Question: does the two-sided Grassmann mixer replace self-attention in a 15 x 256 Conformer-CTC trained on
 LibriSpeech-100 at matched size, and does its Plucker structure beat the same-size symmetric control?
@@ -158,10 +160,11 @@ Checks done on CPU (Apple M3 Pro, 2026-11-14):
 - `make e02-espnet-check`: in ESPnet the four arms have exactly the sizes above; this repo's log-mel is within 4.8e-7
   of ESPnet's frontend; every arm trains one epoch and decodes through ESPnet's own entry points, 135 s.
 
-Expected cost: about 4 to 8 h per run on one A100 (derived from published step rates, not measured); the recipe needs a
-40 GB or larger GPU at 16M bins. Seed 0 of both tracks is 8 runs.
+Measured cost on one A100 40 GB: attention 9.48 h training (8.1 min per epoch) + 1.51 h greedy decoding of the 4 sets
+(batch 1, 2 jobs); Grassmann 10.5 min per epoch, so ~13.7 h per run (projected). Peak memory 22.0 GB (attention) and
+21.3 GB (Grassmann) at 16M bins, so a 40 GB card fits the recipe unchanged. Seed 0 of both tracks is 8 runs.
 
 Limits:
-- The 9.8 / 23.3 target belongs to an inferred encoder size.
+- The 9.8 / 23.3 target belongs to an inferred encoder size; the parity run lands on it.
 - The own trainer departs from ESPnet where the table says; its numbers stand on their own.
 - Two-sided Grassmann is this repo's variant; the paper's layer is causal.
