@@ -3,7 +3,8 @@
 A tested reimplementation of the attention-free Causal Grassmann layer from Zhang Chong, "Attention Is Not What
 You Need" ([arXiv 2512.19428](https://arxiv.org/abs/2512.19428)), a language-model parity check against the
 paper, and two code paths for a speech recognition test of the layer in place of self-attention (Conformer-CTC on
-LibriSpeech-100, ESPnet and a plain PyTorch trainer; not run yet).
+LibriSpeech-100, ESPnet and a plain PyTorch trainer). The attention baseline reproduces the published WER (9.72 / 22.90
+on test-clean / test-other against 9.8 / 23.3); the Grassmann runs are in progress ([results](docs/results.md)).
 
 The layer reduces each token state to 32 dimensions, pairs it with states at fixed offsets {1, 2, 4, 8, 12, 16},
 encodes every pair as the Plucker coordinates of the plane it spans, averages, and gates the result back into
@@ -45,7 +46,7 @@ make help         # every target
 ```
 
 Runs pick CUDA, then MPS, then CPU. The e00 probe times Apple GPUs only. e02 training needs a CUDA GPU with 40 GB or
-more; the full commands are in [docs/experiments.md](docs/experiments.md#e02-grassmann-vs-attention-in-a-conformer-ctc-on-librispeech-100-planned).
+more; the full commands are in [docs/experiments.md](docs/experiments.md#e02-grassmann-vs-attention-in-a-conformer-ctc-on-librispeech-100-running).
 
 ## Layout
 
@@ -64,7 +65,7 @@ more; the full commands are in [docs/experiments.md](docs/experiments.md#e02-gra
 | `python/e00_mps_probe.py` | e00 speed and memory probe |
 | `python/e01_layer_parity.py`, `.toml` | e01 language-model parity, config |
 | `python/e02_ctc.py`, `.toml` | e02 own trainer: prepare, train, decode |
-| `e02_espnet/` | e02 ESPnet track: encoder plug-in, launcher, arm configs, setup, run and check scripts, its own uv env |
+| `e02_espnet/` | e02 ESPnet track: encoder plug-in, launcher, arm configs, setup, run and check scripts, train.log summary (`summary.py`), its own uv env |
 | `docs/` | [architecture](docs/architecture.md), [math](docs/math.md), [experiments](docs/experiments.md), [results](docs/results.md) |
 
 Downloads and caches go to `.cache/`, intermediate data to `work/`, run reports to `reports/`; all three are
