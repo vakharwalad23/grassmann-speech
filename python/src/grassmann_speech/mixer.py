@@ -5,8 +5,12 @@ from torch import nn
 
 from grassmann_speech.plucker import pair_indices, plucker, plucker_norm_sq, symmetric_norm_sq, symmetric_products, unit
 
-# feature, its squared norm from dot products, and feature(b, a) / feature(a, b)
-FEATURES = {"plucker": (plucker, plucker_norm_sq, -1.0), "symmetric": (symmetric_products, symmetric_norm_sq, 1.0)}
+# feature, its squared norm from dot products, feature(b, a) / feature(a, b), sign of a future partner seen from (partner, self)
+FEATURES = {
+    "plucker": (plucker, plucker_norm_sq, -1.0, -1.0),
+    "symmetric": (symmetric_products, symmetric_norm_sq, 1.0, 1.0),
+    "symmetric_signed": (symmetric_products, symmetric_norm_sq, 1.0, -1.0),
+}
 
 
 class GrassmannMixer(nn.Module):
@@ -24,7 +28,7 @@ class GrassmannMixer(nn.Module):
     ):
         super().__init__()
         self.offsets, self.two_sided, self.mean_first, self.eps = tuple(offsets), two_sided, mean_first, eps
-        self.feature, self.norm_sq, self.flip = FEATURES[features]
+        self.feature, self.norm_sq, self.swap, self.flip = FEATURES[features]
         self.red = nn.Linear(d, r)
         self.plu = nn.Linear(r * (r - 1) // 2, d)
         i, j = pair_indices(r)
@@ -51,11 +55,13 @@ class GrassmannMixer(nn.Module):
         for delta in self.pairs(z.shape[1]):
             both = 1.0 if weight is None else weight[:, :-delta] * weight[:, delta:]
             # Paper pairs (z_t, z_{t+delta}) at t; assigning the pair to t+delta instead makes it causal (docs/architecture.md, A1)
-            q = both * self.plu(unit(self.feature(z[:, :-delta], z[:, delta:], self.i, self.j), self.eps))
+            u = unit(self.feature(z[:, :-delta], z[:, delta:], self.i, self.j), self.eps)
+            q = both * self.plu(u)
             acc[:, delta:] += q
             count[:, delta:] += both
             if self.two_sided:
-                acc[:, :-delta] += q
+                # Plucker antisymmetry alone signs past against future; symmetric_signed gets that sign explicitly (docs/math.md)
+                acc[:, :-delta] += q if self.swap * self.flip > 0 else both * self.plu(-u)
                 count[:, :-delta] += both
         # Positions with no valid pair get g = 0 (docs/architecture.md, A3)
         return acc / count.clamp_min(1) * (count > 0)

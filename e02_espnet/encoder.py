@@ -24,8 +24,8 @@ class MixerConformerEncoder(ConformerEncoder):
     def __init__(self, input_size: int, mixer: str, grassmann_rank: int = 32, grassmann_offsets: tuple[int, ...] = (1, 2, 4, 8, 12, 16),
                  **conformer):
         super().__init__(input_size, **conformer)
-        if mixer not in ("grassmann", "symmetric", "none"):
-            raise ValueError(f"mixer must be grassmann, symmetric or none; attention is ESPnet's own conformer: {mixer}")
+        if mixer not in ("grassmann", "symmetric", "symmetric_signed", "none"):
+            raise ValueError(f"mixer must be grassmann, symmetric, symmetric_signed or none; attention is ESPnet's own conformer: {mixer}")
         for layer in self.encoders:
             layer.self_attn = MixerAsAttention(mixer_module(mixer, self.output_size(), 0, grassmann_rank, grassmann_offsets, 0.0))
 

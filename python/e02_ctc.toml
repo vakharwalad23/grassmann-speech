@@ -56,6 +56,10 @@ d_ff = 1024
 mixer = "symmetric"
 d_ff = 1024
 
+[arms.symmetric_signed]
+mixer = "symmetric_signed"
+d_ff = 1024
+
 [arms.no_mixer]
 mixer = "none"
 d_ff = 1344

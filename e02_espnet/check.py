@@ -19,7 +19,8 @@ from encoder import MixerConformerEncoder
 
 HERE = Path(__file__).resolve().parent
 # Own-trainer sizes, unit-tested in python/tests/test_conformer.py
-EXPECTED = {"attention": 26_958_472, "grassmann": 26_021_992, "symmetric": 26_021_992, "no_mixer": 26_945_032}
+EXPECTED = {"attention": 26_958_472, "grassmann": 26_021_992, "symmetric": 26_021_992, "symmetric_signed": 26_021_992,
+            "no_mixer": 26_945_032}
 CTC_HEAD = 256 * 5000 + 5000
 
 

@@ -41,7 +41,7 @@ def test_receptive_field_is_the_offsets():
 
 
 @pytest.mark.parametrize("two_sided", [False, True])
-@pytest.mark.parametrize("features", ["plucker", "symmetric"])
+@pytest.mark.parametrize("features", ["plucker", "symmetric", "symmetric_signed"])
 def test_mean_before_projection_is_exact(two_sided: bool, features: str):
     paper, fast = mixer(two_sided, mean_first=False, features=features), mixer(two_sided, mean_first=True, features=features)
     fast.load_state_dict(paper.state_dict())
@@ -74,7 +74,7 @@ def test_mean_first_stays_close_in_float32(two_sided: bool):
 
 @pytest.mark.parametrize("two_sided", [False, True])
 @pytest.mark.parametrize("mean_first", [False, True])
-@pytest.mark.parametrize("features", ["plucker", "symmetric"])
+@pytest.mark.parametrize("features", ["plucker", "symmetric", "symmetric_signed"])
 def test_padding_changes_nothing_on_real_frames(two_sided: bool, mean_first: bool, features: str):
     m, a = mixer(two_sided, mean_first=mean_first, features=features), x(25)
     padded = torch.cat([a, 100 * torch.randn(2, L - 25, D, dtype=torch.float64)], dim=1)
@@ -90,3 +90,12 @@ def test_mix_stays_fp32_under_bf16_autocast():
         out = m(a)
     assert out.dtype == torch.float32
     assert torch.allclose(out, m(a), atol=1e-6)
+
+
+@pytest.mark.parametrize("mean_first", [False, True])
+@pytest.mark.parametrize("features, sign", [("plucker", -1.0), ("symmetric", 1.0), ("symmetric_signed", -1.0)])
+def test_time_reversal_negates_signed_features_and_the_unsigned_control_is_blind(mean_first: bool, features: str, sign: float):
+    m, a = mixer(True, mean_first=mean_first, features=features), x()
+    with torch.no_grad():
+        m.plu.bias.zero_()
+    assert torch.allclose(m(a.flip(1)).flip(1), sign * m(a), atol=1e-12)

@@ -3,7 +3,7 @@
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$here")
-step=${1:?usage: run.sh prepare, or run.sh attention|grassmann|symmetric|no_mixer [seed]}
+step=${1:?usage: run.sh prepare, or run.sh attention|grassmann|symmetric|symmetric_signed|no_mixer [seed]}
 seed=${2:-0}
 . "$root/vendor/espnet/tools/activate_python.sh"
 cd "$root/vendor/espnet/egs2/librispeech_100/asr1"

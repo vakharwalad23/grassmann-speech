@@ -15,6 +15,7 @@ def test_parameter_counts_match_the_espnet_formulas():
     # Mixer with its LN: rel-pos attention 5d^2 + 6d + 2d = 329,728; gated Grassmann dr + r + C(r,2)d + d + 2d^2 + d + 2d = 267,296
     assert n_params(conformer_ctc(15, "attention")) == SHARED + 15 * 329_728 == 26_958_472
     assert n_params(conformer_ctc(15, "grassmann")) == n_params(conformer_ctc(15, "symmetric")) == SHARED + 15 * 267_296
+    assert n_params(conformer_ctc(15, "symmetric_signed")) == SHARED + 15 * 267_296
     # No mixer keeps its LN (512) and widens the FFN to 1344 to stay within 0.1 percent of attention
     assert n_params(conformer_ctc(15, "none", d_ff=1344)) == 26_945_032
 

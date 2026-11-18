@@ -7,7 +7,7 @@ from torch import nn
 
 from grassmann_speech.mixer import GrassmannMixer
 
-MIXERS = ("attention", "grassmann", "symmetric", "none")
+MIXERS = ("attention", "grassmann", "symmetric", "symmetric_signed", "none")
 
 
 def feed_forward(d: int, d_ff: int, dropout: float) -> nn.Sequential:
@@ -145,8 +145,8 @@ class ConformerCTC(nn.Module):
 def mixer_module(mixer: str, d: int, heads: int, r: int, offsets: Sequence[int], dropout: float) -> nn.Module:
     if mixer == "attention":
         return RelPositionAttention(d, heads, dropout)
-    if mixer in ("grassmann", "symmetric"):
-        return GatedGrassmann(d, r, offsets, "plucker" if mixer == "grassmann" else "symmetric")
+    if mixer in ("grassmann", "symmetric", "symmetric_signed"):
+        return GatedGrassmann(d, r, offsets, "plucker" if mixer == "grassmann" else mixer)
     if mixer == "none":
         return NoMixer()
     raise ValueError(f"mixer must be one of {MIXERS}, got {mixer}")
