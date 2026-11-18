@@ -53,19 +53,21 @@ more; the full commands are in [docs/experiments.md](docs/experiments.md#e02-gra
 | path | holds |
 |---|---|
 | `python/src/grassmann_speech/plucker.py` | Plucker coordinates, symmetric products, norms from dot products |
-| `python/src/grassmann_speech/mixer.py` | `GrassmannMixer`: causal or two-sided, paper form or mean-first, Plucker or symmetric |
+| `python/src/grassmann_speech/mixer.py` | `GrassmannMixer`: causal or two-sided, paper form or mean-first, Plucker, symmetric or direction-signed symmetric |
 | `python/src/grassmann_speech/blocks.py` | Grassmann block and the post-LN Transformer block |
 | `python/src/grassmann_speech/lm.py` | language models for e01 |
-| `python/src/grassmann_speech/conformer.py` | Conformer-CTC laid out as ESPnet's; arms attention, grassmann, symmetric, none |
+| `python/src/grassmann_speech/conformer.py` | Conformer-CTC laid out as ESPnet's; arms attention, grassmann, symmetric, symmetric_signed, none |
 | `python/src/grassmann_speech/features.py` | log-mel as ESPnet's frontend, speed perturbation, SpecAugment |
 | `python/src/grassmann_speech/librispeech.py` | LibriSpeech lists, sealed test manifests, tokenizer, batching, dataset |
 | `python/src/grassmann_speech/wer.py` | the scorer: WER, CER, paired bootstrap over speakers |
+| `python/src/grassmann_speech/recording.py` | synthetic live recordings: macOS speech, gain, mic response, noise, reverb, band limit, clipping, digital silence |
 | `python/src/grassmann_speech/env.py` | device pick and the environment stamp stored with every run |
 | `python/tests/` | unit checks: Plucker identities, causality, receptive field, exactness, parameter counts, FLOPs |
 | `python/e00_mps_probe.py` | e00 speed and memory probe |
 | `python/e01_layer_parity.py`, `.toml` | e01 language-model parity, config |
 | `python/e02_ctc.py`, `.toml` | e02 own trainer: prepare, train, decode |
-| `e02_espnet/` | e02 ESPnet track: encoder plug-in, launcher, arm configs, setup, run and check scripts, train.log summary (`summary.py`), its own uv env |
+| `python/frontend_probe.py` | what a recording (`--wav`) or each capture distortion does to the e02 log-mel features against the LibriSpeech training statistics |
+| `e02_espnet/` | e02 ESPnet track: encoder plug-in, launcher, arm configs, setup, run and check scripts, train.log summary (`summary.py`), checkpoint under capture distortions (`live_probe.py`), its own uv env |
 | `docs/` | [architecture](docs/architecture.md), [math](docs/math.md), [experiments](docs/experiments.md), [results](docs/results.md) |
 
 Downloads and caches go to `.cache/`, intermediate data to `work/`, run reports to `reports/`; all three are

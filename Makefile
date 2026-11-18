@@ -14,7 +14,7 @@ SEED ?= 0
 LIBRISPEECH_PARTS := dev-clean dev-other test-clean test-other train-clean-100
 
 .PHONY: help setup test lint probe-quick probe e01-quick e01-parity e01 e02-data e02-quick e02-prepare e02-train e02-decode \
-	e02-espnet-check e02-espnet-setup e02-espnet-prepare e02-espnet clean
+	e02-espnet-check e02-live-probe e02-espnet-setup e02-espnet-prepare e02-espnet clean
 
 help:
 	@echo "setup        python/.venv from uv.lock (torch 2.15.0, Python 3.15)"
@@ -28,12 +28,13 @@ help:
 	@echo "e02-data     LibriSpeech dev, test and train-clean-100 from OpenSLR into data/librispeech, 7.6 GB"
 	@echo "e02-quick    e02 own trainer, every arm on a synthetic corpus, ~10 s"
 	@echo "e02-prepare  e02 own trainer: split lists, sealed dev/test manifests in corpora/, tokenizer, MVN stats"
-	@echo "e02-train    e02 own trainer, ARM=attention|grassmann|symmetric|no_mixer SEED=0; resumable"
+	@echo "e02-train    e02 own trainer, ARM=attention|grassmann|symmetric|symmetric_signed|no_mixer SEED=0; resumable"
 	@echo "e02-decode   e02 own trainer: average the best checkpoints, greedy decode, score dev and test"
 	@echo "e02-espnet-check    ESPnet track on CPU: arm sizes, frontend parity, 1-epoch train and decode per arm, ~2 min"
+	@echo "e02-live-probe      e02 attention checkpoint on 96 synthetic macOS-speech clips x 9 capture distortions, CPU, ~6 min"
 	@echo "e02-espnet-setup    pinned ESPnet recipe in vendor/espnet and e02_espnet/.venv; needs sox and flac"
 	@echo "e02-espnet-prepare  ESPnet recipe stages 1-10 once: data prep, speed perturbation, BPE, stats"
-	@echo "e02-espnet   ESPnet track ARM=attention|grassmann|symmetric|no_mixer SEED=0: train, greedy decode, score"
+	@echo "e02-espnet   ESPnet track ARM=attention|grassmann|symmetric|symmetric_signed|no_mixer SEED=0: train, greedy decode, score"
 	@echo "clean        delete .cache, work, vendor and the virtual environments (keeps data and reports)"
 
 setup:
@@ -83,6 +84,10 @@ e02-decode:
 e02-espnet-check:
 	@uv sync --project e02_espnet --locked -q
 	@PATH="$(ROOT)/e02_espnet/.venv/bin:$$PATH" PYTHONPATH="$(ROOT)/python/src:$(ROOT)/e02_espnet" python3 e02_espnet/check.py
+
+e02-live-probe:
+	@uv sync --project e02_espnet --locked -q
+	@PATH="$(ROOT)/e02_espnet/.venv/bin:$$PATH" PYTHONPATH="$(ROOT)/python/src:$(ROOT)/e02_espnet" python3 e02_espnet/live_probe.py
 
 e02-espnet-setup:
 	@bash e02_espnet/setup.sh
