@@ -114,7 +114,8 @@ flowchart LR
 |---|---|---|---|
 | **attention** | multi-head attention with Transformer-XL relative positions, 4 heads (ESPnet `rel_selfattn`) | 329,728 | **26,958,472** |
 | grassmann | two-sided gated Grassmann, r 32, offsets {1, 2, 4, 8, 12, 16} each side | 267,296 | 26,021,992 |
-| symmetric | same with symmetric products in place of the Plucker minors | 267,296 | 26,021,992 |
+| symmetric | same with symmetric products in place of the Plucker minors; future partners added with +, so blind to direction | 267,296 | 26,021,992 |
+| symmetric_signed | symmetric products with future partners negated, as Plucker antisymmetry does; only antisymmetry differs from grassmann | 267,296 | 26,021,992 |
 | no_mixer | none; FFN width 1344 instead of 1024 | 512 | 26,945,032 |
 
 Shared parts: subsampling 1,838,080; per block two FFN modules 1,052,160, conv module 206,592, final LN 512; encoder

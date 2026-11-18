@@ -38,6 +38,31 @@ until the run finishes.
 Grassmann, 26,021,992 params: 10 min 18 s training per epoch against 7 min 19 s for attention (~1,760 audio s/s, 0.71x),
 peak 21.3 GB. The learning rate is still warming up at epoch 16 (peak near epoch 26).
 
+### e02 checkpoint under capture distortions
+
+The attention checkpoint above (10-best average, greedy CTC) on 96 synthetic utterances: 12 sentences x 8 macOS voices
+(en-US, en-GB, en-AU, en-IE, en-IN, en-ZA), 1,272 words, 16 kHz, -60 dBFS white floor. Synthetic speech is out of
+domain (15.9 here against 9.72 on test-clean), so the deltas matter, not the absolute WER. Intervals: paired bootstrap
+over the 8 voices. Level match adds one number to the log-mel so its mean equals the training mean; per-bin mean match
+moves each bin's mean to the training mean (both before `global_mvn`, no retraining). Apple M3 Pro CPU, 2026-11-19;
+two runs gave identical error counts.
+
+| condition | WER (errors / words) | vs clean, 95 percent interval | level match | per-bin mean match |
+|---|---|---|---|---|
+| **clean** | 15.9 (202 / 1,272) | - | 15.0 | 15.6 |
+| gain -20 dB | 16.1 (205 / 1,272) | +0.2 (-1.7 to +2.3) | 15.0 | 15.6 |
+| mic response, FIR [1, -0.6, 0.2] | 16.1 (205 / 1,272) | +0.2 (-0.3 to +1.0) | 15.6 | 15.6 |
+| white noise, SNR 20 dB | 25.3 (322 / 1,272) | +9.4 (+7.7 to +11.3) | 22.6 | 23.6 |
+| white noise, SNR 10 dB | 45.4 (578 / 1,272) | +29.6 (+26.7 to +32.7) | 43.7 | 43.2 |
+| reverb, RT60 0.5 s, DRR 0 dB | 38.8 (493 / 1,272) | +22.9 (+18.6 to +27.9) | 39.6 | 41.2 |
+| low-pass 4 kHz | 23.1 (294 / 1,272) | +7.2 (+4.2 to +10.2) | 22.6 | 21.3 |
+| clipped at 30 percent of peak | 25.3 (322 / 1,272) | +9.4 (+5.5 to +14.2) | 25.9 | 27.7 |
+| 1 s digital zeros each side | 14.9 (190 / 1,272) | -0.9 (-2.4 to +0.7) | 15.1 | 15.3 |
+
+Gain, a short mic response and digital silence leave WER unchanged; noise, reverberation, band limiting and clipping
+cost 7 to 30 points. LibriSpeech-100 training with SpecAugment and speed perturbation covers none of these; the inference
+fixes recover at most 2.8 points. Command: `make e02-live-probe`.
+
 ## e01 language-model parity
 
 Wikitext-2-raw-v1, 6 layers, d 256, block 128. Best validation perplexity over 30 epochs (the paper's protocol);

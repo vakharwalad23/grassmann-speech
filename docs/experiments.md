@@ -109,7 +109,8 @@ Grassmann seed 0 ran 16 of 70 epochs. Symmetric, no_mixer and the own trainer ha
 Question: does the two-sided Grassmann mixer replace self-attention in a 15 x 256 Conformer-CTC trained on
 LibriSpeech-100 at matched size, and does its Plucker structure beat the same-size symmetric control?
 
-Arms: attention, grassmann, symmetric, no_mixer ([architecture.md](architecture.md#speech-conformer-ctc-e02)). Target for
+Arms: attention, grassmann, symmetric, symmetric_signed, no_mixer ([architecture.md](architecture.md#speech-conformer-ctc-e02);
+`symmetric_signed` keeps the past/future sign that the unsigned control loses, [math.md](math.md#direction-in-the-two-sided-form)). Target for
 the attention arm: 9.8 / 23.3 WER on test-clean / test-other, greedy CTC, no LM (Miyazaki et al. 2024,
 [arXiv 2406.16808](https://arxiv.org/abs/2406.16808), Table 1; the 15-block encoder is inferred from its 27.0M
 parameters).
@@ -142,7 +143,7 @@ Recipe: `conf/tuning/train_asr_ctc_e_branchformer_e12_mlp1024_linear1024.yaml` w
 make e02-data                          # OpenSLR SLR12 into data/librispeech, 7.6 GB
 make e02-espnet-setup                  # sparse ESPnet checkout in vendor/espnet, e02_espnet/.venv; needs sox and flac
 make e02-espnet-prepare                # recipe stages 1 to 10, once
-make e02-espnet ARM=attention SEED=0   # parity run first, then grassmann, symmetric, no_mixer
+make e02-espnet ARM=attention SEED=0   # parity run first, then grassmann, symmetric_signed, symmetric, no_mixer
 make e02-prepare                       # own trainer: lists, sealed dev/test manifests, tokenizer, MVN
 make e02-train ARM=attention SEED=0 && make e02-decode ARM=attention SEED=0
 uv run --project python python -m grassmann_speech.wer REF HYP_A --against HYP_B   # paired bootstrap
@@ -163,6 +164,13 @@ Checks done on CPU (Apple M3 Pro, 2026-11-14):
 Measured cost on one A100 40 GB: attention 9.48 h training (8.1 min per epoch) + 1.51 h greedy decoding of the 4 sets
 (batch 1, 2 jobs); Grassmann 10.5 min per epoch, so ~13.7 h per run (projected). Peak memory 22.0 GB (attention) and
 21.3 GB (Grassmann) at 16M bins, so a 40 GB card fits the recipe unchanged. Seed 0 of both tracks is 8 runs.
+
+Live-capture probe (`make e02-live-probe`, CPU, ~6 min): the trained attention checkpoint on synthetic macOS speech under
+gain, mic response, white noise, reverberation, a 4 kHz band limit, clipping and digital silence, with two
+inference-time log-mel fixes. Distortions live in `python/src/grassmann_speech/recording.py`; `python/frontend_probe.py
+--wav <file>` reports level, noise floor, bandwidth, clipping and the distance of a real recording's features from the
+LibriSpeech training statistics. Numbers: [results.md](results.md#e02-checkpoint-under-capture-distortions); math:
+[math.md](math.md#log-mel-under-a-capture-chain).
 
 Limits:
 - The 9.8 / 23.3 target belongs to an inferred encoder size; the parity run lands on it.

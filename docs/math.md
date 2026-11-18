@@ -94,6 +94,64 @@ Derivation: the sum over i < j of (a_i b_j + a_j b_i)^2 is the sum over i != j o
 q is symmetric, q(b, a) = q(a, b), so the two-sided partner sum uses sign +1. q is bilinear too, so the
 mean-first form holds unchanged. q changes under a change of basis of the plane: it is not a Grassmann feature.
 
+## Direction in the two-sided form
+
+Let R reverse time. A past partner of t in R h is a future partner of t in h, and |f(a, b)| = |f(b, a)| keeps every
+pair weight, so the partner sum obeys
+
+```math
+s_t(R z) = \sigma \, s_t(z), \qquad g(R h) = \sigma \, R \, g(h) \quad (b_{plu} = 0)
+```
+
+with sigma the sign on future partners. Plucker has sigma = -1 from antisymmetry: its output flips under time
+reversal, so it tells past from future. The symmetric control has sigma = +1: its output is exactly time-reversal
+equivariant, so the mixer cannot tell which side a partner came from. In the two-sided form the control therefore
+differs from Plucker in two ways, not one (the causal language model of e01 has only past partners and is not
+affected). `features="symmetric_signed"` (arm `symmetric_signed`) keeps symmetric products and sets sigma = -1:
+same size, same weights, only antisymmetry differs. `test_time_reversal_negates_signed_features_and_the_unsigned_control_is_blind`
+checks all three to 1e-12.
+
+## What the control isolates
+
+Both features are halves of the outer product: p is the strict upper triangle of a b^T - b a^T, q that of
+a b^T + b a^T. With the partner split along the token, s = c z + s_perp and c = (s . z) / |z|^2:
+
+```math
+p(s, z) = p(s_\perp, z), \qquad q(s, z) = c \, q(z, z) + q(s_\perp, z)
+```
+
+Plucker never sees the component of the partner along the token; the symmetric feature keeps it as c q(z, z), a
+quadratic of the token alone. When neighbouring states are similar (c near 1, |s_perp| small) the symmetric feature
+is mostly that self term: on synthetic AR(1) states (r = 32) the cosine between q(z_t-1, z_t) and q(z_t, z_t) is
+0.61, 0.94 and 0.995 at lag-1 correlation 0.5, 0.9 and 0.99. A Plucker-vs-symmetric tie therefore says the
+antisymmetric half adds nothing over the symmetric half; it does not test multiplication against an additive mix,
+nor the layer against attention. One factor per step, at matched mixer parameters (d = 256, r = 32, 135,456 per
+mixer):
+
+| arm | feature | sign sigma | parameters | differs from the arm above in |
+|---|---|---|---|---|
+| grassmann | p(a, z) | -1 | 135,456 | the paper's layer, two-sided (this repo's variant) |
+| symmetric_signed | q(a, z) | -1 | 135,456 | antisymmetry only |
+| symmetric | q(a, z) | +1 | 135,456 | direction only |
+| additive (not built) | a, with r' = 264 | -1 | 135,688 | multiplication: g = W s + b is linear in the neighbours |
+| no_mixer | none, FFN 1344 | - | total within 0.1 percent | whether a fixed-offset mixer helps at all |
+
+r' solves r'(2d + 1) + d = 135,456: r' = 263.5, rounded to 264, giving 264 x 513 + 256 = 135,688.
+
+## Unit normalization and near-parallel pairs
+
+For a = z + epsilon n, p(a, z) = epsilon p(n, z), so unit(p(a, z)) = unit(p(n, z)) for every epsilon > 0: a pair
+that differs only by noise gives a unit-size feature pointing along the noise. The weight 1 / (|a| |z| sin theta)
+is bounded only by eps. Two bounded weights keep the mean-first identity, because both are one scalar per pair
+(this repo's variants, not the paper's method, untested):
+
+```math
+w_{\sin} = \frac{1}{|a| |z|} \Rightarrow |w p| = \sin\theta, \qquad w_\kappa = \frac{1}{\sqrt{|p|^2 + \kappa^2 |a|^2 |z|^2}}
+```
+
+Worked example at 1 degree (sin theta = 0.0175): paper weight 1.0, w_sin 0.0175, w_kappa with kappa = 0.1 gives
+0.0175 / sqrt(0.0175^2 + 0.01) = 0.172.
+
 ## Cost
 
 Matmul FLOPs of one mixer pass (forward), checked exactly by `test_mixer_matmul_flops_match_the_cost_formulas`:
@@ -160,6 +218,30 @@ Learning rate (ESPnet WarmupLR), step k counted from 1, peak lr eta = 2e-3 at w 
 
 Worked example: k = 7,500 gives eta x 15000^0.5 x 7500 x 15000^-1.5 = eta x 0.5 = 1e-3; k = 60,000 gives
 eta x (15000 / 60000)^0.5 = 1e-3.
+
+## Log-mel under a capture chain
+
+Per mel bin, a recording with gain g, a mic response H shorter than the 25 ms window, additive noise N and a log
+floor epsilon gives, approximately:
+
+```math
+\log Y = \log |X|^2 + \underbrace{2 \log g + \log |H|^2}_{\text{constant offset per bin}}
+       + \underbrace{\log\Big(1 + \frac{|N|^2}{g^2 |H|^2 |X|^2}\Big)}_{\text{depends on the speech}}, \qquad \tilde Y = \max(Y, \epsilon)
+```
+
+- The offset term is constant in time. Per-bin mean subtraction per utterance removes it; a single mean over all
+  bins removes only its average; e02's `global_mvn` (fixed training statistics) removes neither.
+- The noise term raises quiet bins to the noise level and compresses the speech-to-pause contrast; no mean or
+  variance normalization undoes it.
+- A room response of 0.5 s is 20 times the window, so reverberation smears energy across frames instead of adding
+  a per-bin offset.
+- Digital silence lands on the floor: ln(1e-10) = -23.03 sits 3.31 training standard deviations below the mean on
+  average under the e02 statistics.
+
+Worked example with the e02 statistics (per-bin std 3.39 to 4.67): a -20 dB gain shifts every bin by ln(0.01) =
+-4.61 nats, -1.17 std on average; `python/frontend_probe.py` measures an RMS feature change of 1.175 under
+`global_mvn` and 0.000 under per-bin normalization. Feature distance is not WER: the e02 checkpoint's WER does not
+move under that gain ([results.md](results.md#e02-checkpoint-under-capture-distortions)).
 
 ## Run-time projection (e00)
 
